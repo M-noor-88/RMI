@@ -33,7 +33,9 @@ public class ClientApp33 {
         System.out.println("Login success! Token: " + token + ", Dept: " + dept);
 
         while (true) {
-            System.out.println("1. Upload File\n2. View File\n3. Edit File\n4. Exit");
+            //System.out.println("1. Upload File\n2. View File\n3. Edit File\n4. Exit");
+            System.out.println("1. Upload File\n2. View File\n3. Edit File\n4. Delete File\n5. Exit");
+
             int choice = Integer.parseInt(scanner.nextLine());
 
             if (choice == 1) {
@@ -72,6 +74,19 @@ public class ClientApp33 {
                      DataInputStream in = new DataInputStream(socket.getInputStream())) {
 
                     out.writeUTF("EDIT|" + dept + "|" + filename + "|" + content);
+                    System.out.println(in.readUTF());
+                }
+            }
+
+            else if (choice == 4) {
+                System.out.print("Filename to delete: ");
+                String filename = scanner.nextLine();
+
+                try (Socket socket = new Socket("localhost", 8000);
+                     DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+                     DataInputStream in = new DataInputStream(socket.getInputStream())) {
+
+                    out.writeUTF("DELETE|" + dept + "|" + filename);
                     System.out.println(in.readUTF());
                 }
             }

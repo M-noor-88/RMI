@@ -91,6 +91,24 @@ public class Coordinator {
         return port;
     }
     // -------------------------------
+
+    // Delete
+    static void syncDeleteFileAcrossNodes(String dept, String filename, int excludePort) {
+        for (int port : nodePorts) {
+            if (port == excludePort) continue;
+
+            try (
+                    Socket socket = new Socket("localhost", port);
+                    DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            ) {
+                out.writeUTF("DELETE|" + dept + "|" + filename);
+                System.out.println("[SYNC] Deletion synced to node " + port);
+            } catch (IOException e) {
+                System.out.println("[SYNC FAIL] Could not sync delete to node " + port);
+            }
+        }
+    }
+// ----------------------------------------
     static void handleClient(Socket socket) {
         try (
                 DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -165,6 +183,38 @@ public class Coordinator {
                     out.writeUTF("All nodes are down. Operation failed.");
                 }
 
+            }
+
+            else if (parts[0].equals("DELETE")) {
+                boolean success = false;
+                int attempts = 0;
+
+                while (!success && attempts < nodePorts.length) {
+                    int nodePort = getNextNodePortForEdit(); // load balance
+                    try (
+                            Socket nodeSocket = new Socket("localhost", nodePort);
+                            DataOutputStream nodeOut = new DataOutputStream(nodeSocket.getOutputStream());
+                            DataInputStream nodeIn = new DataInputStream(nodeSocket.getInputStream());
+                    ) {
+                        nodeOut.writeUTF(cmd); // DELETE|dept|filename
+                        String response = nodeIn.readUTF();
+                        if (response.equals("DELETED")) {
+                            out.writeUTF("File deleted successfully from main node.");
+                            syncDeleteFileAcrossNodes(parts[1], parts[2], nodePort); // dept, filename, skip main node
+                            success = true;
+                        } else {
+                            out.writeUTF("Delete failed: " + response);
+                            success = true; // still stop retries
+                        }
+                    } catch (IOException e) {
+                        System.out.println("[Failover] Node " + nodePort + " is down, trying next...");
+                        attempts++;
+                    }
+                }
+
+                if (!success) {
+                    out.writeUTF("Delete failed. All nodes are down.");
+                }
             }
 
         } catch (IOException e) {
