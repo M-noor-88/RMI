@@ -17,14 +17,17 @@ public class AuthServiceImpl extends UnicastRemoteObject implements AuthService 
 
     protected AuthServiceImpl() throws RemoteException {
         super();
-      /*  users.put("ali", "123");
+        users.put("ali", "123");
         departments.put("ali", "graphics");
 
-        users.put("sara", "456");
+        users.put("sara", "123");
         departments.put("sara", "development");
 
-        users.put("ahmad", "789");
-        departments.put("ahmad", "qa"); */
+        users.put("ahmad", "123");
+        departments.put("ahmad", "qa");
+
+        users.put("noor", "123");
+        departments.put("noor", "qa");
 
         users.put("admin", "admin123");
         departments.put("admin", "management");

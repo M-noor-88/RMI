@@ -10,6 +10,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Node9003 {
+
+    static String nodeId = "9003";
+
     public static void main(String[] args) throws IOException {
         int port = Integer.parseInt("9003");
         ServerSocket serverSocket = new ServerSocket(port);
@@ -23,7 +26,7 @@ public class Node9003 {
 
                     autoSyncFilesToOtherNodes("9003"); //
 
-                    Thread.sleep(10_000); // wait 10 seconds before next sync
+                    Thread.sleep(3600_000); // wait 10 seconds before next sync
 
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -41,7 +44,9 @@ public class Node9003 {
 
 
     public static void autoSyncFilesToOtherNodes(String currentNode) {
-        String folderPath = "NodeStorage/";
+        //String folderPath = "NodeStorage/";
+        String folderPath = "Node" + currentNode + "Storage/";
+
         File folder = new File(folderPath);
 
         System.out.println(folder);
@@ -77,7 +82,7 @@ public class Node9003 {
                         FileInputStream fis = new FileInputStream(file);
 
                         // Send department + file name
-                        String message = deptFolder.getName() + "|" + file.getName();
+                        String message = "SYNC|" + deptFolder.getName() + "|" + file.getName();
                         dos.writeUTF(message);
 
                         byte[] buffer = new byte[4096];
@@ -110,23 +115,58 @@ public class Node9003 {
             String msg = in.readUTF();
             String[] parts = msg.split("\\|");
 
+            // Base folder for this node (important!)
+            String baseFolder = "Node9003Storage/"; // ← غيّر هذا حسب رقم الـ Node الحالي
+
+            // === حالة استلام ملف من autoSync (من Node آخر) ===
+            if (parts[0].equals("SYNC") && parts.length == 3) {
+                String dept = parts[1];
+                String filename = parts[2];
+
+                File dir = new File(baseFolder + dept);
+                dir.mkdirs();
+
+                File file = new File(dir, filename);
+
+                try (FileOutputStream fos = new FileOutputStream(file)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = in.read(buffer)) > 0) {
+                        fos.write(buffer, 0, bytesRead);
+                        if (bytesRead < 4096) break; // نهاية الملف
+                    }
+                }
+
+                System.out.println("[SYNC] Received file: " + filename + " into " + baseFolder + dept);
+                return; // لا تتابع باقي الشروط
+            }
+
+            // === حالة رفع ملف من المستخدم (عبر UPLOAD) ===
             if (parts[0].equals("UPLOAD")) {
                 String dept = parts[1];
                 String filename = parts[2];
                 String content = parts[3];
 
-                File dir = new File("NodeStorage/" + dept);
+                System.out.println("Also upload --------------------------------------");
+                File dir = new File(baseFolder + dept);
                 dir.mkdirs();
 
                 try (FileWriter writer = new FileWriter(new File(dir, filename))) {
                     writer.write(content);
                 }
+                new Thread(() -> autoSyncFilesToOtherNodes(nodeId)).start();
 
             } else if (parts[0].equals("GET")) {
                 String filename = parts[1];
 
+
                 // نبحث داخل جميع المجلدات في NodeStorage
-                File root = new File("NodeStorage");
+                //File root = new File("NodeStorage");
+                //File root = new File("Node9003Storage/");
+                File root = new File("Node" + nodeId + "Storage/");
+
+                System.out.println("GET :===================" + root + " File Name ---------" + filename);
+
                 File[] departments = root.listFiles(File::isDirectory);
 
                 boolean found = false;
@@ -146,20 +186,32 @@ public class Node9003 {
                 if (!found) {
                     out.writeUTF("NOT_FOUND");
                 }
-            }
-            else if (parts[0].equals("EDIT")) {
+            } else if (parts[0].equals("EDIT")) {
                 String dept = parts[1];
                 String filename = parts[2];
                 String newContent = parts[3];
 
-                File file = new File("NodeStorage/" + dept + "/" + filename);
+                File file = new File(baseFolder + dept + "/" + filename);
                 if (file.exists()) {
                     try (FileWriter writer = new FileWriter(file)) {
                         writer.write(newContent);
                     }
+                    new Thread(() -> autoSyncFilesToOtherNodes(nodeId)).start();
+
                     out.writeUTF("File edited successfully.");
                 } else {
                     out.writeUTF("File not found for editing.");
+                }
+            }
+
+            else if (parts[0].equals("DELETE")) {
+                String dept = parts[1];
+                String filename = parts[2];
+                File file = new File(baseFolder + dept + "/" + filename);
+                if (file.exists() && file.delete()) {
+                    out.writeUTF("DELETED");
+                } else {
+                    out.writeUTF("File not found or delete failed.");
                 }
             }
 
@@ -167,4 +219,5 @@ public class Node9003 {
             e.printStackTrace();
         }
     }
+
 }
